@@ -5,29 +5,32 @@ interface Product {
   id: string;
   name: string;
   category: string;
+  size?: string[];
+  color?: string[];
+  image?: string;
   price: number;
-  stock: number;
-  status: string;
 }
 
 export function Products() {
   const [products, setProducts] = useState<Product[]>([
-    { id: "1", name: "Laptop Pro", category: "Electronics", price: 1299, stock: 45, status: "Active" },
-    { id: "2", name: "Wireless Mouse", category: "Accessories", price: 29, stock: 120, status: "Active" },
-    { id: "3", name: "USB-C Cable", category: "Accessories", price: 15, stock: 200, status: "Active" },
-    { id: "4", name: "Smartphone X", category: "Electronics", price: 899, stock: 60, status: "Active" },
-    { id: "5", name: "Bluetooth Headphones", category: "Audio", price: 199, stock: 85, status: "Active" },
+    { id: "1", name: "Classic T-Shirt", category: "Men", size: ["M"], color: ["Black"], price: 29 },
+    { id: "2", name: "Summer Dress", category: "Women", size: ["S"], color: ["Red"], price: 49 },
+    { id: "3", name: "Unisex Hoodie", category: "Men & Women", size: ["L"], color: ["Blue"], price: 59 },
+    { id: "4", name: "Denim Jacket", category: "Men", size: ["XL"], color: ["Blue"], price: 89 },
+    { id: "5", name: "Running Shoes", category: "Men & Women", size: ["M"], color: ["White"], price: 120 },
   ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
     name: "",
-    category: "",
+    category: "Men",
+    size: [] as string[],
+    color: [] as string[],
+    image: "",
     price: "",
-    stock: "",
-    status: "Active",
   });
 
   const handleOpenModal = (product?: Product) => {
@@ -36,18 +39,20 @@ export function Products() {
       setFormData({
         name: product.name,
         category: product.category,
+        size: product.size || [],
+        color: product.color || [],
+        image: product.image || "",
         price: product.price.toString(),
-        stock: product.stock.toString(),
-        status: product.status,
       });
     } else {
       setEditingProduct(null);
       setFormData({
         name: "",
-        category: "",
+        category: "Men",
+        size: [],
+        color: [],
+        image: "",
         price: "",
-        stock: "",
-        status: "Active",
       });
     }
     setIsModalOpen(true);
@@ -65,7 +70,7 @@ export function Products() {
       // Update existing product
       setProducts(products.map(p =>
         p.id === editingProduct.id
-          ? { ...p, ...formData, price: parseFloat(formData.price), stock: parseInt(formData.stock) }
+          ? { ...p, ...formData, price: parseFloat(formData.price) }
           : p
       ));
     } else {
@@ -74,9 +79,10 @@ export function Products() {
         id: (products.length + 1).toString(),
         name: formData.name,
         category: formData.category,
+        size: formData.size,
+        color: formData.color,
+        image: formData.image,
         price: parseFloat(formData.price),
-        stock: parseInt(formData.stock),
-        status: formData.status,
       };
       setProducts([...products, newProduct]);
     }
@@ -85,8 +91,13 @@ export function Products() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this product?")) {
-      setProducts(products.filter(p => p.id !== id));
+    setProductToDelete(id);
+  };
+
+  const confirmDelete = () => {
+    if (productToDelete) {
+      setProducts(products.filter(p => p.id !== productToDelete));
+      setProductToDelete(null);
     }
   };
 
@@ -133,11 +144,10 @@ export function Products() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left">ID</th>
+                <th className="px-6 py-3 text-left">Image</th>
                 <th className="px-6 py-3 text-left">Product Name</th>
                 <th className="px-6 py-3 text-left">Category</th>
                 <th className="px-6 py-3 text-left">Price</th>
-                <th className="px-6 py-3 text-left">Stock</th>
-                <th className="px-6 py-3 text-left">Status</th>
                 <th className="px-6 py-3 text-left">Actions</th>
               </tr>
             </thead>
@@ -145,21 +155,16 @@ export function Products() {
               {filteredProducts.map((product) => (
                 <tr key={product.id} className="border-b hover:bg-gray-50">
                   <td className="px-6 py-4">{product.id}</td>
+                  <td className="px-6 py-4">
+                    {product.image ? (
+                      <img src={product.image} alt={product.name} className="w-10 h-10 object-cover rounded" />
+                    ) : (
+                      <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-500">No Img</div>
+                    )}
+                  </td>
                   <td className="px-6 py-4">{product.name}</td>
                   <td className="px-6 py-4">{product.category}</td>
                   <td className="px-6 py-4">${product.price}</td>
-                  <td className="px-6 py-4">{product.stock}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        product.status === "Active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {product.status}
-                    </span>
-                  </td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
                       <button
@@ -185,8 +190,9 @@ export function Products() {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 backdrop-blur-sm bg-white/20" onClick={handleCloseModal} />
+          <div className="relative z-10 bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-2xl mb-4">
               {editingProduct ? "Edit Product" : "Add New Product"}
             </h2>
@@ -203,45 +209,84 @@ export function Products() {
               </div>
               <div>
                 <label className="block text-sm mb-2">Category</label>
-                <input
-                  type="text"
+                <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
                   required
-                />
-              </div>
-              <div>
-                <label className="block text-sm mb-2">Price</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm mb-2">Stock</label>
-                <input
-                  type="number"
-                  value={formData.stock}
-                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm mb-2">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
                 >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
+                  <option value="Men">Men</option>
+                  <option value="Women">Women</option>
+                  <option value="Men & Women">Men & Women (Together)</option>
                 </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm mb-2">Sizes Available</label>
+                  <div className="flex flex-wrap gap-2">
+                    {["S", "M", "L", "XL"].map(s => (
+                      <label key={s} className="flex items-center gap-1 text-sm border px-2 py-1 rounded cursor-pointer hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          checked={formData.size.includes(s)}
+                          onChange={(e) => {
+                            if (e.target.checked) setFormData({ ...formData, size: [...formData.size, s] });
+                            else setFormData({ ...formData, size: formData.size.filter(x => x !== s) });
+                          }}
+                        />
+                        {s}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm mb-2">Colors Available</label>
+                  <div className="flex flex-wrap gap-2">
+                    {["Black", "White", "Silver", "Blue", "Red"].map(c => (
+                      <label key={c} className="flex items-center gap-1 text-sm border px-2 py-1 rounded cursor-pointer hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          checked={formData.color.includes(c)}
+                          onChange={(e) => {
+                            if (e.target.checked) setFormData({ ...formData, color: [...formData.color, c] });
+                            else setFormData({ ...formData, color: formData.color.filter(x => x !== c) });
+                          }}
+                        />
+                        {c}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm mb-2">Price</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm mb-2">Upload Image</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      const url = URL.createObjectURL(e.target.files[0]);
+                      setFormData({ ...formData, image: url });
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+                {formData.image && (
+                  <div className="mt-2 text-sm text-gray-500">Image selected/uploaded</div>
+                )}
               </div>
               <div className="flex gap-3 pt-4">
                 <button
@@ -260,6 +305,31 @@ export function Products() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {productToDelete && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 backdrop-blur-sm bg-white/20" onClick={() => setProductToDelete(null)} />
+          <div className="relative z-10 bg-white rounded-lg p-6 w-full max-w-sm text-center">
+            <h2 className="text-xl font-semibold mb-4 text-gray-800">Delete Product</h2>
+            <p className="text-gray-600 mb-6">Are you sure you want to delete this product? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setProductToDelete(null)}
+                className="flex-1 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

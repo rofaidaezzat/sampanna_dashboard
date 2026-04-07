@@ -172,8 +172,9 @@ export function ContactUs() {
 
       {/* Message Details Modal */}
       {selectedMessage && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 backdrop-blur-sm bg-white/20" onClick={() => setSelectedMessage(null)} />
+          <div className="relative z-10 bg-white rounded-lg p-6 w-full max-w-lg">
             <h2 className="text-2xl mb-4">Message Details</h2>
             <div className="space-y-4">
               <div>

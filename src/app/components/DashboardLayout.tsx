@@ -9,6 +9,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import logoImg from "../../assets/sampanna.jpg";
 
 export function DashboardLayout() {
   const navigate = useNavigate();
@@ -41,8 +42,8 @@ export function DashboardLayout() {
           isSidebarOpen ? "w-64" : "w-0"
         } bg-white shadow-lg transition-all duration-300 overflow-hidden`}
       >
-        <div className="p-6 border-b" style={{ borderColor: '#fef200' }}>
-          <h2 className="text-2xl">Dashboard</h2>
+        <div className="w-full flex justify-center border-b" style={{ borderColor: '#fef200' }}>
+          <img src={logoImg} alt="Sampanna" className="w-full h-32 object-cover" />
         </div>
 
         <nav className="p-4 space-y-2">
