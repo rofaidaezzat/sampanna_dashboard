@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import logo from "../../assets/sampanna-removebg-preview.png";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -26,6 +27,7 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#FAF5F5' }}>
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="text-center mb-8">
+          <img src={logo} alt="Sampanna Logo" className="h-32 mx-auto object-contain" />
           <h1 className="text-3xl mb-2">Dashboard Login</h1>
           <p className="text-gray-600">Enter your credentials to access the dashboard</p>
         </div>
