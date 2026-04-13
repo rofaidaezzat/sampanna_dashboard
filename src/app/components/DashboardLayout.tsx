@@ -10,10 +10,12 @@ import {
   X,
 } from "lucide-react";
 import logoImg from "../../assets/sampanna.jpg";
+import { useLogoutMutation } from "../../redux/services/crudauth";
 
 export function DashboardLayout() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [logout] = useLogoutMutation();
 
   useEffect(() => {
     const isAuthenticated = localStorage.getItem("isAuthenticated");
@@ -22,7 +24,12 @@ export function DashboardLayout() {
     }
   }, [navigate]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap();
+    } catch {
+      localStorage.removeItem("token");
+    }
     localStorage.removeItem("isAuthenticated");
     navigate("/login");
   };

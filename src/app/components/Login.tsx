@@ -2,24 +2,35 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import logo from "../../assets/sampanna-removebg-preview.png";
+import { useLoginMutation } from "../../redux/services/crudauth";
 
 export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [login, { isLoading }] = useLoginMutation();
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    // Frontend-only validation
-    if (email === "admin@dashboard.com" && password === "admin123") {
+    try {
+      await login({ email, password }).unwrap();
       localStorage.setItem("isAuthenticated", "true");
       navigate("/");
-    } else {
-      setError("Invalid email or password");
+    } catch (err: unknown) {
+      const maybeError = err as {
+        data?: { message?: string };
+        message?: string;
+      };
+
+      setError(
+        maybeError?.data?.message ??
+          maybeError?.message ??
+          "Login failed. Please check your credentials.",
+      );
     }
   };
 
@@ -78,15 +89,14 @@ export function Login() {
 
           <button
             type="submit"
+            disabled={isLoading}
             className="w-full py-3 rounded-lg transition-colors"
             style={{ backgroundColor: '#fef200', color: '#000' }}
           >
-            Sign In
+            {isLoading ? "Signing In..." : "Sign In"}
           </button>
 
-          <div className="text-sm text-gray-600 text-center mt-4">
-            Demo credentials: admin@dashboard.com / admin123
-          </div>
+          <div className="text-sm text-gray-600 text-center mt-4">Use admin API credentials</div>
         </form>
       </div>
     </div>

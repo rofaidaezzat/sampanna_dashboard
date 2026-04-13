@@ -1,90 +1,62 @@
 import { useState } from "react";
-import { Search, Eye } from "lucide-react";
+import { Search, Eye, Trash2 } from "lucide-react";
+import {
+  useDeleteOrderMutation,
+  useGetAllOrdersQuery,
+} from "../../redux/services/crudorder";
 
 interface Order {
-  id: string;
-  customer: string;
-  email: string;
-  product: string;
-  quantity: number;
-  total: number;
-  status: string;
-  date: string;
+  _id?: string;
+  id?: string;
+  customer?: string;
+  customerName?: string;
+  email?: string;
+  product?: string;
+  productName?: string;
+  quantity?: number;
+  total?: number;
+  totalPrice?: number;
+  status?: string;
+  date?: string;
+  createdAt?: string;
+  [key: string]: unknown;
 }
 
 export function Orders() {
-  const [orders] = useState<Order[]>([
-    {
-      id: "ORD-001",
-      customer: "John Doe",
-      email: "john@example.com",
-      product: "Laptop Pro",
-      quantity: 1,
-      total: 1299,
-      status: "Delivered",
-      date: "2026-04-05",
-    },
-    {
-      id: "ORD-002",
-      customer: "Jane Smith",
-      email: "jane@example.com",
-      product: "Smartphone X",
-      quantity: 2,
-      total: 1798,
-      status: "Pending",
-      date: "2026-04-06",
-    },
-    {
-      id: "ORD-003",
-      customer: "Mike Johnson",
-      email: "mike@example.com",
-      product: "Bluetooth Headphones",
-      quantity: 1,
-      total: 199,
-      status: "Shipped",
-      date: "2026-04-04",
-    },
-    {
-      id: "ORD-004",
-      customer: "Sarah Williams",
-      email: "sarah@example.com",
-      product: "Wireless Mouse",
-      quantity: 3,
-      total: 87,
-      status: "Processing",
-      date: "2026-04-07",
-    },
-    {
-      id: "ORD-005",
-      customer: "Tom Brown",
-      email: "tom@example.com",
-      product: "USB-C Cable",
-      quantity: 5,
-      total: 75,
-      status: "Delivered",
-      date: "2026-04-03",
-    },
-    {
-      id: "ORD-006",
-      customer: "Emily Davis",
-      email: "emily@example.com",
-      product: "Laptop Pro",
-      quantity: 1,
-      total: 1299,
-      status: "Pending",
-      date: "2026-04-07",
-    },
-  ]);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [actionError, setActionError] = useState("");
+
+  const { data, isLoading, isError } = useGetAllOrdersQuery();
+  const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
+  const orders = ((data?.data as Order[]) ?? []);
 
   const filteredOrders = orders.filter(
     (order) =>
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product.toLowerCase().includes(searchTerm.toLowerCase())
+      (order._id ?? order.id ?? "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      (order.customer ?? order.customerName ?? "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      (order.product ?? order.productName ?? "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
   );
+
+  const handleDeleteOrder = async (id: string) => {
+    setActionError("");
+    try {
+      await deleteOrder(id).unwrap();
+    } catch (err: unknown) {
+      const maybeError = err as { data?: { message?: string }; message?: string };
+      setActionError(
+        maybeError?.data?.message ??
+          maybeError?.message ??
+          "Failed to delete order.",
+      );
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -143,35 +115,59 @@ export function Orders() {
             </thead>
             <tbody>
               {filteredOrders.map((order) => (
-                <tr key={order.id} className="border-b hover:bg-gray-50">
-                  <td className="px-6 py-4">{order.id}</td>
-                  <td className="px-6 py-4">{order.customer}</td>
-                  <td className="px-6 py-4">{order.product}</td>
-                  <td className="px-6 py-4">{order.quantity}</td>
-                  <td className="px-6 py-4">${order.total}</td>
+                <tr key={order._id ?? order.id} className="border-b hover:bg-gray-50">
+                  <td className="px-6 py-4">{order._id ?? order.id ?? "-"}</td>
+                  <td className="px-6 py-4">{order.customer ?? order.customerName ?? "-"}</td>
+                  <td className="px-6 py-4">{order.product ?? order.productName ?? "-"}</td>
+                  <td className="px-6 py-4">{order.quantity ?? "-"}</td>
+                  <td className="px-6 py-4">${order.total ?? order.totalPrice ?? 0}</td>
                   <td className="px-6 py-4">
                     <span
                       className={`px-3 py-1 rounded-full text-sm ${getStatusColor(
-                        order.status
+                        order.status ?? ""
                       )}`}
                     >
-                      {order.status}
+                      {order.status ?? "Unknown"}
                     </span>
                   </td>
-                  <td className="px-6 py-4">{order.date}</td>
+                  <td className="px-6 py-4">{order.date ?? order.createdAt?.slice(0, 10) ?? "-"}</td>
                   <td className="px-6 py-4">
-                    <button
-                      onClick={() => setSelectedOrder(order)}
-                      className="p-2 rounded-lg hover:bg-blue-50 text-blue-600"
-                    >
-                      <Eye size={18} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedOrder(order)}
+                        className="p-2 rounded-lg hover:bg-blue-50 text-blue-600"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      <button
+                        disabled={isDeleting}
+                        onClick={() => {
+                          const id = order._id ?? order.id;
+                          if (id) {
+                            void handleDeleteOrder(id);
+                          }
+                        }}
+                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 disabled:opacity-50"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
+              {!isLoading && filteredOrders.length === 0 && (
+                <tr>
+                  <td className="px-6 py-8 text-center text-gray-500" colSpan={8}>
+                    No orders found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+        {isLoading && <div className="p-6 text-gray-600">Loading orders...</div>}
+        {isError && <div className="p-6 text-red-600">Failed to load orders.</div>}
+        {actionError && <div className="p-6 text-red-600">{actionError}</div>}
       </div>
 
       {/* Order Details Modal */}
@@ -184,40 +180,40 @@ export function Orders() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-600 text-sm">Order ID</p>
-                  <p>{selectedOrder.id}</p>
+                  <p>{selectedOrder._id ?? selectedOrder.id ?? "-"}</p>
                 </div>
                 <div>
                   <p className="text-gray-600 text-sm">Date</p>
-                  <p>{selectedOrder.date}</p>
+                  <p>{selectedOrder.date ?? selectedOrder.createdAt?.slice(0, 10) ?? "-"}</p>
                 </div>
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Customer</p>
-                <p>{selectedOrder.customer}</p>
-                <p className="text-sm text-gray-500">{selectedOrder.email}</p>
+                <p>{selectedOrder.customer ?? selectedOrder.customerName ?? "-"}</p>
+                <p className="text-sm text-gray-500">{selectedOrder.email ?? "-"}</p>
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Product</p>
-                <p>{selectedOrder.product}</p>
+                <p>{selectedOrder.product ?? selectedOrder.productName ?? "-"}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-600 text-sm">Quantity</p>
-                  <p>{selectedOrder.quantity}</p>
+                  <p>{selectedOrder.quantity ?? "-"}</p>
                 </div>
                 <div>
                   <p className="text-gray-600 text-sm">Total</p>
-                  <p>${selectedOrder.total}</p>
+                  <p>${selectedOrder.total ?? selectedOrder.totalPrice ?? 0}</p>
                 </div>
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Status</p>
                 <span
                   className={`inline-block px-3 py-1 rounded-full text-sm ${getStatusColor(
-                    selectedOrder.status
+                    selectedOrder.status ?? ""
                   )}`}
                 >
-                  {selectedOrder.status}
+                  {selectedOrder.status ?? "Unknown"}
                 </span>
               </div>
             </div>

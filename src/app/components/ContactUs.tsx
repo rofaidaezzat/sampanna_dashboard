@@ -1,70 +1,13 @@
 import { useState } from "react";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
-
-interface Message {
-  id: string;
-  name: string;
-  email: string;
-  subject: string;
-  message: string;
-  date: string;
-  status: string;
-}
+import {
+  ContactMessage,
+  useGetContactQuery,
+} from "../../redux/services/crudcontact";
 
 export function ContactUs() {
-  const [messages] = useState<Message[]>([
-    {
-      id: "MSG-001",
-      name: "Alice Johnson",
-      email: "alice@example.com",
-      subject: "Product Inquiry",
-      message: "I would like to know more about the Laptop Pro specifications.",
-      date: "2026-04-07",
-      status: "New",
-    },
-    {
-      id: "MSG-002",
-      name: "Bob Wilson",
-      email: "bob@example.com",
-      subject: "Order Issue",
-      message: "My order ORD-123 hasn't arrived yet. Can you help?",
-      date: "2026-04-06",
-      status: "Pending",
-    },
-    {
-      id: "MSG-003",
-      name: "Carol Martinez",
-      email: "carol@example.com",
-      subject: "Return Request",
-      message: "I would like to return the headphones I purchased last week.",
-      date: "2026-04-05",
-      status: "Resolved",
-    },
-    {
-      id: "MSG-004",
-      name: "David Lee",
-      email: "david@example.com",
-      subject: "Partnership Opportunity",
-      message: "Interested in discussing a potential business partnership.",
-      date: "2026-04-04",
-      status: "New",
-    },
-  ]);
-
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "New":
-        return "bg-blue-100 text-blue-700";
-      case "Pending":
-        return "bg-yellow-100 text-yellow-700";
-      case "Resolved":
-        return "bg-green-100 text-green-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
+  const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
+  const { data: messages = [], isLoading, isError } = useGetContactQuery();
 
   return (
     <div className="space-y-6">
@@ -132,29 +75,17 @@ export function ContactUs() {
                 <th className="px-6 py-3 text-left">ID</th>
                 <th className="px-6 py-3 text-left">Name</th>
                 <th className="px-6 py-3 text-left">Email</th>
-                <th className="px-6 py-3 text-left">Subject</th>
                 <th className="px-6 py-3 text-left">Date</th>
-                <th className="px-6 py-3 text-left">Status</th>
                 <th className="px-6 py-3 text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
               {messages.map((message) => (
-                <tr key={message.id} className="border-b hover:bg-gray-50">
-                  <td className="px-6 py-4">{message.id}</td>
+                <tr key={message._id} className="border-b hover:bg-gray-50">
+                  <td className="px-6 py-4">{message._id}</td>
                   <td className="px-6 py-4">{message.name}</td>
                   <td className="px-6 py-4">{message.email}</td>
-                  <td className="px-6 py-4">{message.subject}</td>
-                  <td className="px-6 py-4">{message.date}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm ${getStatusColor(
-                        message.status
-                      )}`}
-                    >
-                      {message.status}
-                    </span>
-                  </td>
+                  <td className="px-6 py-4">{message.createdAt.slice(0, 10)}</td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => setSelectedMessage(message)}
@@ -165,9 +96,18 @@ export function ContactUs() {
                   </td>
                 </tr>
               ))}
+              {!isLoading && messages.length === 0 && (
+                <tr>
+                  <td className="px-6 py-8 text-center text-gray-500" colSpan={5}>
+                    No messages found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+        {isLoading && <div className="p-6 text-gray-600">Loading messages...</div>}
+        {isError && <div className="p-6 text-red-600">Failed to load messages.</div>}
       </div>
 
       {/* Message Details Modal */}
@@ -179,7 +119,7 @@ export function ContactUs() {
             <div className="space-y-4">
               <div>
                 <p className="text-gray-600 text-sm">Message ID</p>
-                <p>{selectedMessage.id}</p>
+                <p>{selectedMessage._id}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -188,7 +128,7 @@ export function ContactUs() {
                 </div>
                 <div>
                   <p className="text-gray-600 text-sm">Date</p>
-                  <p>{selectedMessage.date}</p>
+                  <p>{selectedMessage.createdAt.slice(0, 10)}</p>
                 </div>
               </div>
               <div>
@@ -196,24 +136,10 @@ export function ContactUs() {
                 <p>{selectedMessage.email}</p>
               </div>
               <div>
-                <p className="text-gray-600 text-sm">Subject</p>
-                <p>{selectedMessage.subject}</p>
-              </div>
-              <div>
                 <p className="text-gray-600 text-sm">Message</p>
                 <p className="mt-1 p-3 bg-gray-50 rounded-lg">
                   {selectedMessage.message}
                 </p>
-              </div>
-              <div>
-                <p className="text-gray-600 text-sm">Status</p>
-                <span
-                  className={`inline-block px-3 py-1 rounded-full text-sm ${getStatusColor(
-                    selectedMessage.status
-                  )}`}
-                >
-                  {selectedMessage.status}
-                </span>
               </div>
             </div>
             <div className="mt-6 flex gap-3">

@@ -1,59 +1,75 @@
-import { useState } from "react";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Product,
+  useCreateProductMutation,
+  useDeleteProductMutation,
+  useGetAllProductsQuery,
+  useUpdateProductMutation,
+} from "../../redux/services/crudproduct";
 
-interface Product {
-  id: string;
+type ProductForm = {
   name: string;
+  description: string;
   category: string;
-  size?: string[];
-  color?: string[];
-  image?: string;
-  price: number;
-}
+  size: string[];
+  color: string[];
+  price: string;
+  imageFile: File | null;
+};
+
+const initialForm: ProductForm = {
+  name: "",
+  description: "",
+  category: "men",
+  size: [],
+  color: [],
+  price: "",
+  imageFile: null,
+};
 
 export function Products() {
-  const [products, setProducts] = useState<Product[]>([
-    { id: "1", name: "Classic T-Shirt", category: "Men", size: ["M"], color: ["Black"], price: 29 },
-    { id: "2", name: "Summer Dress", category: "Women", size: ["S"], color: ["Red"], price: 49 },
-    { id: "3", name: "Unisex Hoodie", category: "Men & Women", size: ["L"], color: ["Blue"], price: 59 },
-    { id: "4", name: "Denim Jacket", category: "Men", size: ["XL"], color: ["Blue"], price: 89 },
-    { id: "5", name: "Running Shoes", category: "Men & Women", size: ["M"], color: ["White"], price: 120 },
-  ]);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "Men",
-    size: [] as string[],
-    color: [] as string[],
-    image: "",
-    price: "",
-  });
+  const [error, setError] = useState("");
+  const [formData, setFormData] = useState<ProductForm>(initialForm);
+
+  const { data, isLoading, isError } = useGetAllProductsQuery();
+  const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
+  const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
+  const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
+
+  const products = data?.data ?? [];
+  const isSubmitting = isCreating || isUpdating;
+
+  const filteredProducts = useMemo(
+    () =>
+      products.filter(
+        (product) =>
+          product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          product.category.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
+    [products, searchTerm],
+  );
 
   const handleOpenModal = (product?: Product) => {
+    setError("");
     if (product) {
       setEditingProduct(product);
       setFormData({
         name: product.name,
+        description: product.description,
         category: product.category,
-        size: product.size || [],
-        color: product.color || [],
-        image: product.image || "",
+        size: product.sizes,
+        color: product.colors,
         price: product.price.toString(),
+        imageFile: null,
       });
     } else {
       setEditingProduct(null);
-      setFormData({
-        name: "",
-        category: "Men",
-        size: [],
-        color: [],
-        image: "",
-        price: "",
-      });
+      setFormData(initialForm);
     }
     setIsModalOpen(true);
   };
@@ -61,50 +77,59 @@ export function Products() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingProduct(null);
+    setFormData(initialForm);
+    setError("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
 
-    if (editingProduct) {
-      // Update existing product
-      setProducts(products.map(p =>
-        p.id === editingProduct.id
-          ? { ...p, ...formData, price: parseFloat(formData.price) }
-          : p
-      ));
-    } else {
-      // Create new product
-      const newProduct: Product = {
-        id: (products.length + 1).toString(),
-        name: formData.name,
-        category: formData.category,
-        size: formData.size,
-        color: formData.color,
-        image: formData.image,
-        price: parseFloat(formData.price),
-      };
-      setProducts([...products, newProduct]);
+    const body = new FormData();
+    body.append("name", formData.name);
+    body.append("description", formData.description);
+    body.append("category", formData.category);
+    body.append("price", formData.price);
+    body.append("sizes", JSON.stringify(formData.size));
+    body.append("colors", JSON.stringify(formData.color));
+
+    if (formData.imageFile) {
+      body.append("images", formData.imageFile);
     }
 
-    handleCloseModal();
+    try {
+      if (editingProduct) {
+        await updateProduct({ id: editingProduct._id, body }).unwrap();
+      } else {
+        await createProduct(body).unwrap();
+      }
+      handleCloseModal();
+    } catch (err: unknown) {
+      const maybeError = err as { data?: { message?: string }; message?: string };
+      setError(
+        maybeError?.data?.message ??
+          maybeError?.message ??
+          "Request failed. Please try again.",
+      );
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setProductToDelete(id);
-  };
+  const handleDeleteProduct = async () => {
+    if (!productToDelete?._id) return;
+    setError("");
 
-  const confirmDelete = () => {
-    if (productToDelete) {
-      setProducts(products.filter(p => p.id !== productToDelete));
+    try {
+      await deleteProduct(productToDelete._id).unwrap();
       setProductToDelete(null);
+    } catch (err: unknown) {
+      const maybeError = err as { data?: { message?: string }; message?: string };
+      setError(
+        maybeError?.data?.message ??
+          maybeError?.message ??
+          "Failed to delete product.",
+      );
     }
   };
-
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="space-y-6">
@@ -153,11 +178,11 @@ export function Products() {
             </thead>
             <tbody>
               {filteredProducts.map((product) => (
-                <tr key={product.id} className="border-b hover:bg-gray-50">
-                  <td className="px-6 py-4">{product.id}</td>
+                <tr key={product._id} className="border-b hover:bg-gray-50">
+                  <td className="px-6 py-4">{product._id}</td>
                   <td className="px-6 py-4">
-                    {product.image ? (
-                      <img src={product.image} alt={product.name} className="w-10 h-10 object-cover rounded" />
+                    {product.images?.[0] ? (
+                      <img src={product.images[0]} alt={product.name} className="w-10 h-10 object-cover rounded" />
                     ) : (
                       <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-500">No Img</div>
                     )}
@@ -174,8 +199,9 @@ export function Products() {
                         <Pencil size={18} />
                       </button>
                       <button
-                        onClick={() => handleDelete(product.id)}
-                        className="p-2 rounded-lg hover:bg-red-50 text-red-600"
+                        disabled={isDeleting}
+                        onClick={() => setProductToDelete(product)}
+                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 disabled:opacity-50"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -183,9 +209,18 @@ export function Products() {
                   </td>
                 </tr>
               ))}
+              {!isLoading && filteredProducts.length === 0 && (
+                <tr>
+                  <td className="px-6 py-8 text-center text-gray-500" colSpan={6}>
+                    No products found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+        {isLoading && <div className="p-6 text-gray-600">Loading products...</div>}
+        {isError && <div className="p-6 text-red-600">Failed to load products.</div>}
       </div>
 
       {/* Modal */}
@@ -208,6 +243,16 @@ export function Products() {
                 />
               </div>
               <div>
+                <label className="block text-sm mb-2">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  rows={3}
+                  required
+                />
+              </div>
+              <div>
                 <label className="block text-sm mb-2">Category</label>
                 <select
                   value={formData.category}
@@ -215,9 +260,9 @@ export function Products() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
                   required
                 >
-                  <option value="Men">Men</option>
-                  <option value="Women">Women</option>
-                  <option value="Men & Women">Men & Women (Together)</option>
+                  <option value="men">Men</option>
+                  <option value="women">Women</option>
+                  <option value="kids">Kids</option>
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -278,23 +323,32 @@ export function Products() {
                   accept="image/*"
                   onChange={(e) => {
                     if (e.target.files && e.target.files[0]) {
-                      const url = URL.createObjectURL(e.target.files[0]);
-                      setFormData({ ...formData, image: url });
+                      setFormData({ ...formData, imageFile: e.target.files[0] });
                     }
                   }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
                 />
-                {formData.image && (
+                {formData.imageFile && (
                   <div className="mt-2 text-sm text-gray-500">Image selected/uploaded</div>
                 )}
               </div>
+              {error && (
+                <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-2 rounded-lg">
+                  {error}
+                </div>
+              )}
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   className="flex-1 py-2 rounded-lg"
                   style={{ backgroundColor: '#fef200', color: '#000' }}
                 >
-                  {editingProduct ? "Update" : "Create"}
+                  {isSubmitting
+                    ? "Saving..."
+                    : editingProduct
+                      ? "Update"
+                      : "Create"}
                 </button>
                 <button
                   type="button"
@@ -309,19 +363,25 @@ export function Products() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {productToDelete && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="absolute inset-0 backdrop-blur-sm bg-white/20" onClick={() => setProductToDelete(null)} />
+          <div
+            className="absolute inset-0 backdrop-blur-sm bg-white/20"
+            onClick={() => setProductToDelete(null)}
+          />
           <div className="relative z-10 bg-white rounded-lg p-6 w-full max-w-sm text-center">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">Delete Product</h2>
-            <p className="text-gray-600 mb-6">Are you sure you want to delete this product? This action cannot be undone.</p>
+            <h2 className="text-xl font-semibold mb-3 text-gray-800">Delete Product</h2>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete{" "}
+              <span className="font-medium">{productToDelete.name}</span>?
+            </p>
             <div className="flex gap-3">
               <button
-                onClick={confirmDelete}
-                className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
+                onClick={() => void handleDeleteProduct()}
+                disabled={isDeleting}
+                className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-50"
               >
-                Delete
+                {isDeleting ? "Deleting..." : "Delete"}
               </button>
               <button
                 onClick={() => setProductToDelete(null)}
