@@ -6,6 +6,7 @@ import {
   useGetAllOrdersQuery,
   useLazyGetOrderByIdQuery,
 } from "../../redux/services/crudorder";
+import { useGetAllProductsQuery } from "../../redux/services/crudproduct";
 
 interface Order {
   _id?: string;
@@ -21,6 +22,22 @@ interface Order {
   status?: string;
   date?: string;
   createdAt?: string;
+  userInfo?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+  cartItems?: Array<{
+    product?: string;
+    price?: number;
+    variations?: Array<{
+      quantity?: number;
+      size?: string;
+      color?: string;
+    }>;
+  }>;
+  totalOrderPrice?: number;
+  orderStatus?: string;
   [key: string]: unknown;
 }
 
@@ -30,19 +47,73 @@ export function Orders() {
   const [actionError, setActionError] = useState("");
 
   const { data, isLoading, isError } = useGetAllOrdersQuery();
+  const { data: productsResponse } = useGetAllProductsQuery();
   const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
   const [getOrderById, { isLoading: isFetchingDetails }] = useLazyGetOrderByIdQuery();
   const orders = ((data?.data as Order[]) ?? []);
+  const products = productsResponse?.data ?? [];
+
+  const getCustomerName = (order: Order) =>
+    order.userInfo?.name ?? order.customer ?? order.customerName ?? "-";
+
+  const getCustomerEmail = (order: Order) =>
+    order.userInfo?.email ?? order.email ?? "-";
+
+  const getFirstProduct = (order: Order) => {
+    if (order.productName) return order.productName;
+    const productId = order.product ?? order.cartItems?.[0]?.product;
+    if (!productId) return "-";
+    const productName = products.find((item) => item._id === productId)?.name;
+    return productName ?? productId;
+  };
+
+  const getOrderSize = (order: Order) => {
+    const sizes =
+      order.cartItems?.flatMap(
+        (item) => item.variations?.map((variation) => variation.size).filter(Boolean) ?? [],
+      ) ?? [];
+    return sizes.length > 0 ? sizes.join(", ") : "-";
+  };
+
+  const getOrderColor = (order: Order) => {
+    const colors =
+      order.cartItems?.flatMap(
+        (item) => item.variations?.map((variation) => variation.color).filter(Boolean) ?? [],
+      ) ?? [];
+    return colors.length > 0 ? colors.join(", ") : "-";
+  };
+
+  const getTotalQuantity = (order: Order) => {
+    if (typeof order.quantity === "number") return order.quantity;
+    return (
+      order.cartItems?.reduce(
+        (sum, item) =>
+          sum +
+          (item.variations?.reduce(
+            (variationSum, variation) =>
+              variationSum + (variation.quantity ?? 0),
+            0,
+          ) ?? 0),
+        0,
+      ) ?? "-"
+    );
+  };
+
+  const getOrderTotal = (order: Order) =>
+    order.totalOrderPrice ?? order.total ?? order.totalPrice ?? 0;
+
+  const getOrderStatus = (order: Order) =>
+    order.orderStatus ?? order.status ?? "Unknown";
 
   const filteredOrders = orders.filter(
     (order) =>
       (order._id ?? order.id ?? "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      (order.customer ?? order.customerName ?? "")
+      getCustomerName(order)
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      (order.product ?? order.productName ?? "")
+      getFirstProduct(order)
         .toLowerCase()
         .includes(searchTerm.toLowerCase())
   );
@@ -83,8 +154,16 @@ export function Orders() {
       case "Shipped":
         return "bg-blue-100 text-blue-700";
       case "Pending":
+      case "pending":
         return "bg-yellow-100 text-yellow-700";
+      case "Delivered":
+      case "delivered":
+        return "bg-green-100 text-green-700";
+      case "Shipped":
+      case "shipped":
+        return "bg-blue-100 text-blue-700";
       case "Processing":
+      case "processing":
         return "bg-purple-100 text-purple-700";
       default:
         return "bg-gray-100 text-gray-700";
@@ -124,9 +203,10 @@ export function Orders() {
                 <th className="px-6 py-3 text-left">Order ID</th>
                 <th className="px-6 py-3 text-left">Customer</th>
                 <th className="px-6 py-3 text-left">Product</th>
+                <th className="px-6 py-3 text-left">Size</th>
+                <th className="px-6 py-3 text-left">Color</th>
                 <th className="px-6 py-3 text-left">Quantity</th>
                 <th className="px-6 py-3 text-left">Total</th>
-                <th className="px-6 py-3 text-left">Status</th>
                 <th className="px-6 py-3 text-left">Date</th>
                 <th className="px-6 py-3 text-left">Actions</th>
               </tr>
@@ -135,19 +215,12 @@ export function Orders() {
               {filteredOrders.map((order) => (
                 <tr key={order._id ?? order.id} className="border-b hover:bg-gray-50">
                   <td className="px-6 py-4">{order._id ?? order.id ?? "-"}</td>
-                  <td className="px-6 py-4">{order.customer ?? order.customerName ?? "-"}</td>
-                  <td className="px-6 py-4">{order.product ?? order.productName ?? "-"}</td>
-                  <td className="px-6 py-4">{order.quantity ?? "-"}</td>
-                  <td className="px-6 py-4">${order.total ?? order.totalPrice ?? 0}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm ${getStatusColor(
-                        order.status ?? ""
-                      )}`}
-                    >
-                      {order.status ?? "Unknown"}
-                    </span>
-                  </td>
+                  <td className="px-6 py-4">{getCustomerName(order)}</td>
+                  <td className="px-6 py-4">{getFirstProduct(order)}</td>
+                  <td className="px-6 py-4">{getOrderSize(order)}</td>
+                  <td className="px-6 py-4">{getOrderColor(order)}</td>
+                  <td className="px-6 py-4">{getTotalQuantity(order)}</td>
+                  <td className="px-6 py-4">${getOrderTotal(order)}</td>
                   <td className="px-6 py-4">{order.date ?? order.createdAt?.slice(0, 10) ?? "-"}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -181,7 +254,7 @@ export function Orders() {
               ))}
               {!isLoading && filteredOrders.length === 0 && (
                 <tr>
-                  <td className="px-6 py-8 text-center text-gray-500" colSpan={8}>
+                  <td className="px-6 py-8 text-center text-gray-500" colSpan={9}>
                     No orders found.
                   </td>
                 </tr>
@@ -213,31 +286,41 @@ export function Orders() {
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Customer</p>
-                <p>{selectedOrder.customer ?? selectedOrder.customerName ?? "-"}</p>
-                <p className="text-sm text-gray-500">{selectedOrder.email ?? "-"}</p>
+                <p>{getCustomerName(selectedOrder)}</p>
+                <p className="text-sm text-gray-500">{getCustomerEmail(selectedOrder)}</p>
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Product</p>
-                <p>{selectedOrder.product ?? selectedOrder.productName ?? "-"}</p>
+                <p>{getFirstProduct(selectedOrder)}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600 text-sm">Size</p>
+                  <p>{getOrderSize(selectedOrder)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">Color</p>
+                  <p>{getOrderColor(selectedOrder)}</p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-600 text-sm">Quantity</p>
-                  <p>{selectedOrder.quantity ?? "-"}</p>
+                  <p>{getTotalQuantity(selectedOrder)}</p>
                 </div>
                 <div>
                   <p className="text-gray-600 text-sm">Total</p>
-                  <p>${selectedOrder.total ?? selectedOrder.totalPrice ?? 0}</p>
+                  <p>${getOrderTotal(selectedOrder)}</p>
                 </div>
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Status</p>
                 <span
                   className={`inline-block px-3 py-1 rounded-full text-sm ${getStatusColor(
-                    selectedOrder.status ?? ""
+                    getOrderStatus(selectedOrder)
                   )}`}
                 >
-                  {selectedOrder.status ?? "Unknown"}
+                  {getOrderStatus(selectedOrder)}
                 </span>
               </div>
             </div>

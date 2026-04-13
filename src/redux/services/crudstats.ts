@@ -19,7 +19,7 @@ export const statsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getStats: builder.query<StatsResponse, void>({
       query: () => ({
-        url: "/api/v1/stats",
+        url: "/api/v1/auth/stats",
         method: "GET",
       }),
     }),
