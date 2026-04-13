@@ -1,10 +1,11 @@
 import React from "react";
 import { useState } from "react";
-import { Search, Eye, Trash2 } from "lucide-react";
+import { Search, Eye, Trash2, Pencil } from "lucide-react";
 import {
   useDeleteOrderMutation,
   useGetAllOrdersQuery,
   useLazyGetOrderByIdQuery,
+  useUpdateOrderMutation,
 } from "../../redux/services/crudorder";
 import { useGetAllProductsQuery } from "../../redux/services/crudproduct";
 
@@ -38,17 +39,39 @@ interface Order {
   }>;
   totalOrderPrice?: number;
   orderStatus?: string;
+  shippingAddress?: {
+    city?: string;
+    district?: string;
+    details?: string;
+  };
   [key: string]: unknown;
 }
+
+type EditOrderForm = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  city: string;
+  district: string;
+  details: string;
+  product: string;
+  price: string;
+  quantity: string;
+  size: string;
+  color: string;
+};
 
 export function Orders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [editingOrder, setEditingOrder] = useState<EditOrderForm | null>(null);
   const [actionError, setActionError] = useState("");
 
   const { data, isLoading, isError } = useGetAllOrdersQuery();
   const { data: productsResponse } = useGetAllProductsQuery();
   const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
+  const [updateOrder, { isLoading: isUpdating }] = useUpdateOrderMutation();
   const [getOrderById, { isLoading: isFetchingDetails }] = useLazyGetOrderByIdQuery();
   const orders = ((data?.data as Order[]) ?? []);
   const products = productsResponse?.data ?? [];
@@ -147,22 +170,82 @@ export function Orders() {
     }
   };
 
+  const handleOpenEditOrder = (order: Order) => {
+    const firstItem = order.cartItems?.[0];
+    const firstVariation = firstItem?.variations?.[0];
+    const id = order._id ?? order.id;
+    if (!id) return;
+
+    setEditingOrder({
+      id,
+      name: order.userInfo?.name ?? "",
+      email: order.userInfo?.email ?? "",
+      phone: order.userInfo?.phone ?? "",
+      city: order.shippingAddress?.city ?? "",
+      district: order.shippingAddress?.district ?? "",
+      details: order.shippingAddress?.details ?? "",
+      product: firstItem?.product ?? "",
+      price: String(firstItem?.price ?? 0),
+      quantity: String(firstVariation?.quantity ?? 1),
+      size: firstVariation?.size ?? "M",
+      color: firstVariation?.color ?? "Black",
+    });
+  };
+
+  const handleUpdateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOrder) return;
+    setActionError("");
+
+    try {
+      await updateOrder({
+        id: editingOrder.id,
+        body: {
+          userInfo: {
+            name: editingOrder.name,
+            email: editingOrder.email,
+            phone: editingOrder.phone,
+          },
+          cartItems: [
+            {
+              product: editingOrder.product,
+              price: Number(editingOrder.price),
+              variations: [
+                {
+                  quantity: Number(editingOrder.quantity),
+                  size: editingOrder.size,
+                  color: editingOrder.color,
+                },
+              ],
+            },
+          ],
+          shippingAddress: {
+            city: editingOrder.city,
+            district: editingOrder.district,
+            details: editingOrder.details,
+          },
+        },
+      }).unwrap();
+
+      setEditingOrder(null);
+    } catch (err: unknown) {
+      const maybeError = err as { data?: { message?: string }; message?: string };
+      setActionError(
+        maybeError?.data?.message ??
+          maybeError?.message ??
+          "Failed to update order.",
+      );
+    }
+  };
+
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Delivered":
-        return "bg-green-100 text-green-700";
-      case "Shipped":
-        return "bg-blue-100 text-blue-700";
-      case "Pending":
+    switch (status.toLowerCase()) {
       case "pending":
         return "bg-yellow-100 text-yellow-700";
-      case "Delivered":
       case "delivered":
         return "bg-green-100 text-green-700";
-      case "Shipped":
       case "shipped":
         return "bg-blue-100 text-blue-700";
-      case "Processing":
       case "processing":
         return "bg-purple-100 text-purple-700";
       default:
@@ -207,6 +290,7 @@ export function Orders() {
                 <th className="px-6 py-3 text-left">Color</th>
                 <th className="px-6 py-3 text-left">Quantity</th>
                 <th className="px-6 py-3 text-left">Total</th>
+                <th className="px-6 py-3 text-left">Status</th>
                 <th className="px-6 py-3 text-left">Date</th>
                 <th className="px-6 py-3 text-left">Actions</th>
               </tr>
@@ -221,6 +305,15 @@ export function Orders() {
                   <td className="px-6 py-4">{getOrderColor(order)}</td>
                   <td className="px-6 py-4">{getTotalQuantity(order)}</td>
                   <td className="px-6 py-4">${getOrderTotal(order)}</td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm ${getStatusColor(
+                        getOrderStatus(order)
+                      )}`}
+                    >
+                      {getOrderStatus(order)}
+                    </span>
+                  </td>
                   <td className="px-6 py-4">{order.date ?? order.createdAt?.slice(0, 10) ?? "-"}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -235,6 +328,12 @@ export function Orders() {
                         className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 disabled:opacity-50"
                       >
                         <Eye size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleOpenEditOrder(order)}
+                        className="p-2 rounded-lg hover:bg-amber-50 text-amber-600"
+                      >
+                        <Pencil size={18} />
                       </button>
                       <button
                         disabled={isDeleting}
@@ -254,7 +353,7 @@ export function Orders() {
               ))}
               {!isLoading && filteredOrders.length === 0 && (
                 <tr>
-                  <td className="px-6 py-8 text-center text-gray-500" colSpan={9}>
+                  <td className="px-6 py-8 text-center text-gray-500" colSpan={10}>
                     No orders found.
                   </td>
                 </tr>
@@ -333,6 +432,154 @@ export function Orders() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editingOrder && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div
+            className="absolute inset-0 backdrop-blur-sm bg-white/20"
+            onClick={() => setEditingOrder(null)}
+          />
+          <div className="relative z-10 bg-white rounded-lg p-6 w-full max-w-2xl">
+            <h2 className="text-2xl mb-4">Update Order</h2>
+            <form onSubmit={handleUpdateOrder} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  value={editingOrder.name}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, name: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Name"
+                  required
+                />
+                <input
+                  type="email"
+                  value={editingOrder.email}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, email: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Email"
+                  required
+                />
+                <input
+                  value={editingOrder.phone}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, phone: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Phone"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  value={editingOrder.city}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, city: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="City"
+                  required
+                />
+                <input
+                  value={editingOrder.district}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, district: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="District"
+                  required
+                />
+                <input
+                  value={editingOrder.details}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, details: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Address Details"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <select
+                  value={editingOrder.product}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, product: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  required
+                >
+                  <option value="">Select product</option>
+                  {products.map((product) => (
+                    <option key={product._id} value={product._id}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={editingOrder.price}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, price: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Price"
+                  required
+                />
+                <input
+                  type="number"
+                  value={editingOrder.quantity}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, quantity: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Quantity"
+                  required
+                />
+                <input
+                  value={editingOrder.size}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, size: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Size"
+                  required
+                />
+                <input
+                  value={editingOrder.color}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, color: e.target.value })
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Color"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className="flex-1 py-2 rounded-lg"
+                  style={{ backgroundColor: "#fef200", color: "#000" }}
+                >
+                  {isUpdating ? "Updating..." : "Update Order"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingOrder(null)}
+                  className="flex-1 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

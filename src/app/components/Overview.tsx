@@ -1,13 +1,29 @@
 import React from "react";
 import { Package, ShoppingCart, MessageSquare, TrendingUp } from "lucide-react";
 import { useGetAllOrdersQuery } from "../../redux/services/crudorder";
+import { useGetAllProductsQuery } from "../../redux/services/crudproduct";
 import { useGetStatsQuery } from "../../redux/services/crudstats";
 
 export function Overview() {
   const { data: statsResponse, isLoading: isStatsLoading } = useGetStatsQuery();
   const { data: ordersResponse, isLoading: isOrdersLoading } = useGetAllOrdersQuery();
+  const { data: productsResponse } = useGetAllProductsQuery();
   const statsData = (statsResponse?.data ?? {}) as Record<string, unknown>;
   const orders = (ordersResponse?.data as Array<Record<string, unknown>>) ?? [];
+  const products = productsResponse?.data ?? [];
+
+  const normalizeRevenue = (value: unknown) => {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") return Number(value) || 0;
+    if (Array.isArray(value)) {
+      return value.reduce((sum, item) => {
+        if (typeof item === "number") return sum + item;
+        if (typeof item === "string") return sum + (Number(item) || 0);
+        return sum;
+      }, 0);
+    }
+    return 0;
+  };
 
   const stats = [
     {
@@ -38,6 +54,7 @@ export function Overview() {
       title: "Messages",
       value: String(
         statsData.totalMessages ??
+          statsData.totalMsgs ??
           statsData.messages ??
           statsData.messageCount ??
           0,
@@ -48,10 +65,8 @@ export function Overview() {
     },
     {
       title: "Revenue",
-      value: `$${String(
-        statsData.totalRevenue ??
-          statsData.revenue ??
-          0,
+      value: `$${normalizeRevenue(
+        statsData.totalRevenue ?? statsData.revenue ?? 0,
       )}`,
       change: "+15%",
       icon: TrendingUp,
@@ -66,6 +81,58 @@ export function Overview() {
       return bTime - aTime;
     })
     .slice(0, 5);
+
+  const getCustomerName = (order: Record<string, unknown>) =>
+    String(
+      (order.userInfo as { name?: string } | undefined)?.name ??
+        order.customer ??
+        order.customerName ??
+        "-",
+    );
+
+  const getProductName = (order: Record<string, unknown>) => {
+    const cartItems = (order.cartItems as Array<{ product?: string }> | undefined) ?? [];
+    const productId = String(order.product ?? order.productName ?? cartItems[0]?.product ?? "-");
+    const matched = products.find((item) => item._id === productId);
+    return matched?.name ?? productId;
+  };
+
+  const getSize = (order: Record<string, unknown>) => {
+    const cartItems =
+      (order.cartItems as Array<{ variations?: Array<{ size?: string }> }> | undefined) ?? [];
+    const sizes = cartItems.flatMap((item) =>
+      (item.variations ?? [])
+        .map((variation) => variation.size)
+        .filter((value): value is string => Boolean(value)),
+    );
+    return sizes.length ? sizes.join(", ") : "-";
+  };
+
+  const getColor = (order: Record<string, unknown>) => {
+    const cartItems =
+      (order.cartItems as Array<{ variations?: Array<{ color?: string }> }> | undefined) ?? [];
+    const colors = cartItems.flatMap((item) =>
+      (item.variations ?? [])
+        .map((variation) => variation.color)
+        .filter((value): value is string => Boolean(value)),
+    );
+    return colors.length ? colors.join(", ") : "-";
+  };
+
+  const getQuantity = (order: Record<string, unknown>) => {
+    const cartItems =
+      (order.cartItems as Array<{ variations?: Array<{ quantity?: number }> }> | undefined) ?? [];
+    const quantity = cartItems.reduce(
+      (sum, item) =>
+        sum +
+        (item.variations?.reduce(
+          (innerSum, variation) => innerSum + (variation.quantity ?? 0),
+          0,
+        ) ?? 0),
+      0,
+    );
+    return quantity || "-";
+  };
 
   return (
     <div className="space-y-6">
@@ -105,37 +172,29 @@ export function Overview() {
                 <th className="px-6 py-3 text-left">Order ID</th>
                 <th className="px-6 py-3 text-left">Customer</th>
                 <th className="px-6 py-3 text-left">Product</th>
-                <th className="px-6 py-3 text-left">Status</th>
-                <th className="px-6 py-3 text-left">Amount</th>
+                <th className="px-6 py-3 text-left">Size</th>
+                <th className="px-6 py-3 text-left">Color</th>
+                <th className="px-6 py-3 text-left">Quantity</th>
+                <th className="px-6 py-3 text-left">Total</th>
+                <th className="px-6 py-3 text-left">Date</th>
               </tr>
             </thead>
             <tbody>
               {recentOrders.map((order) => (
                 <tr key={String(order._id ?? order.id)} className="border-b hover:bg-gray-50">
                   <td className="px-6 py-4">{String(order._id ?? order.id ?? "-")}</td>
-                  <td className="px-6 py-4">{String(order.customer ?? order.customerName ?? "-")}</td>
-                  <td className="px-6 py-4">{String(order.product ?? order.productName ?? "-")}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        String(order.status ?? "") === "Delivered"
-                          ? "bg-green-100 text-green-700"
-                          : String(order.status ?? "") === "Shipped"
-                          ? "bg-blue-100 text-blue-700"
-                          : String(order.status ?? "") === "Pending"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      {String(order.status ?? "Unknown")}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">${String(order.total ?? order.totalPrice ?? 0)}</td>
+                  <td className="px-6 py-4">{getCustomerName(order)}</td>
+                  <td className="px-6 py-4">{getProductName(order)}</td>
+                  <td className="px-6 py-4">{getSize(order)}</td>
+                  <td className="px-6 py-4">{getColor(order)}</td>
+                  <td className="px-6 py-4">{String(getQuantity(order))}</td>
+                  <td className="px-6 py-4">${String(order.totalOrderPrice ?? order.total ?? order.totalPrice ?? 0)}</td>
+                  <td className="px-6 py-4">{String(order.date ?? order.createdAt ?? "-").slice(0, 10)}</td>
                 </tr>
               ))}
               {!isOrdersLoading && recentOrders.length === 0 && (
                 <tr>
-                  <td className="px-6 py-6 text-center text-gray-500" colSpan={5}>
+                  <td className="px-6 py-6 text-center text-gray-500" colSpan={8}>
                     No recent orders found.
                   </td>
                 </tr>
