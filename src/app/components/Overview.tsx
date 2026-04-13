@@ -1,44 +1,71 @@
+import React from "react";
 import { Package, ShoppingCart, MessageSquare, TrendingUp } from "lucide-react";
+import { useGetAllOrdersQuery } from "../../redux/services/crudorder";
+import { useGetStatsQuery } from "../../redux/services/crudstats";
 
 export function Overview() {
+  const { data: statsResponse, isLoading: isStatsLoading } = useGetStatsQuery();
+  const { data: ordersResponse, isLoading: isOrdersLoading } = useGetAllOrdersQuery();
+  const statsData = (statsResponse?.data ?? {}) as Record<string, unknown>;
+  const orders = (ordersResponse?.data as Array<Record<string, unknown>>) ?? [];
+
   const stats = [
     {
       title: "Total Products",
-      value: "156",
+      value: String(
+        statsData.totalProducts ??
+          statsData.products ??
+          statsData.productCount ??
+          0,
+      ),
       change: "+12%",
       icon: Package,
       color: "#fef200",
     },
     {
       title: "Total Orders",
-      value: "1,234",
+      value: String(
+        statsData.totalOrders ??
+          statsData.orders ??
+          statsData.orderCount ??
+          0,
+      ),
       change: "+8%",
       icon: ShoppingCart,
       color: "#fef200",
     },
     {
       title: "Messages",
-      value: "48",
+      value: String(
+        statsData.totalMessages ??
+          statsData.messages ??
+          statsData.messageCount ??
+          0,
+      ),
       change: "+5",
       icon: MessageSquare,
       color: "#fef200",
     },
     {
       title: "Revenue",
-      value: "$45,678",
+      value: `$${String(
+        statsData.totalRevenue ??
+          statsData.revenue ??
+          0,
+      )}`,
       change: "+15%",
       icon: TrendingUp,
       color: "#fef200",
     },
   ];
 
-  const recentOrders = [
-    { id: "ORD-001", customer: "John Doe", product: "Laptop", status: "Delivered", amount: "$1,299" },
-    { id: "ORD-002", customer: "Jane Smith", product: "Smartphone", status: "Pending", amount: "$899" },
-    { id: "ORD-003", customer: "Mike Johnson", product: "Headphones", status: "Shipped", amount: "$199" },
-    { id: "ORD-004", customer: "Sarah Williams", product: "Tablet", status: "Processing", amount: "$599" },
-    { id: "ORD-005", customer: "Tom Brown", product: "Smartwatch", status: "Delivered", amount: "$399" },
-  ];
+  const recentOrders = [...orders]
+    .sort((a, b) => {
+      const aTime = new Date(String(a.createdAt ?? a.date ?? 0)).getTime();
+      const bTime = new Date(String(b.createdAt ?? b.date ?? 0)).getTime();
+      return bTime - aTime;
+    })
+    .slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -84,31 +111,41 @@ export function Overview() {
             </thead>
             <tbody>
               {recentOrders.map((order) => (
-                <tr key={order.id} className="border-b hover:bg-gray-50">
-                  <td className="px-6 py-4">{order.id}</td>
-                  <td className="px-6 py-4">{order.customer}</td>
-                  <td className="px-6 py-4">{order.product}</td>
+                <tr key={String(order._id ?? order.id)} className="border-b hover:bg-gray-50">
+                  <td className="px-6 py-4">{String(order._id ?? order.id ?? "-")}</td>
+                  <td className="px-6 py-4">{String(order.customer ?? order.customerName ?? "-")}</td>
+                  <td className="px-6 py-4">{String(order.product ?? order.productName ?? "-")}</td>
                   <td className="px-6 py-4">
                     <span
                       className={`px-3 py-1 rounded-full text-sm ${
-                        order.status === "Delivered"
+                        String(order.status ?? "") === "Delivered"
                           ? "bg-green-100 text-green-700"
-                          : order.status === "Shipped"
+                          : String(order.status ?? "") === "Shipped"
                           ? "bg-blue-100 text-blue-700"
-                          : order.status === "Pending"
+                          : String(order.status ?? "") === "Pending"
                           ? "bg-yellow-100 text-yellow-700"
                           : "bg-gray-100 text-gray-700"
                       }`}
                     >
-                      {order.status}
+                      {String(order.status ?? "Unknown")}
                     </span>
                   </td>
-                  <td className="px-6 py-4">{order.amount}</td>
+                  <td className="px-6 py-4">${String(order.total ?? order.totalPrice ?? 0)}</td>
                 </tr>
               ))}
+              {!isOrdersLoading && recentOrders.length === 0 && (
+                <tr>
+                  <td className="px-6 py-6 text-center text-gray-500" colSpan={5}>
+                    No recent orders found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+        {(isStatsLoading || isOrdersLoading) && (
+          <div className="p-6 text-gray-600">Loading dashboard data...</div>
+        )}
       </div>
     </div>
   );

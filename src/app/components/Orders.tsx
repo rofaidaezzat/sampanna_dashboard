@@ -1,8 +1,10 @@
+import React from "react";
 import { useState } from "react";
 import { Search, Eye, Trash2 } from "lucide-react";
 import {
   useDeleteOrderMutation,
   useGetAllOrdersQuery,
+  useLazyGetOrderByIdQuery,
 } from "../../redux/services/crudorder";
 
 interface Order {
@@ -29,6 +31,7 @@ export function Orders() {
 
   const { data, isLoading, isError } = useGetAllOrdersQuery();
   const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
+  const [getOrderById, { isLoading: isFetchingDetails }] = useLazyGetOrderByIdQuery();
   const orders = ((data?.data as Order[]) ?? []);
 
   const filteredOrders = orders.filter(
@@ -54,6 +57,21 @@ export function Orders() {
         maybeError?.data?.message ??
           maybeError?.message ??
           "Failed to delete order.",
+      );
+    }
+  };
+
+  const handleViewOrder = async (id: string) => {
+    setActionError("");
+    try {
+      const response = await getOrderById(id).unwrap();
+      setSelectedOrder((response.data as Order) ?? null);
+    } catch (err: unknown) {
+      const maybeError = err as { data?: { message?: string }; message?: string };
+      setActionError(
+        maybeError?.data?.message ??
+          maybeError?.message ??
+          "Failed to load order details.",
       );
     }
   };
@@ -134,8 +152,14 @@ export function Orders() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setSelectedOrder(order)}
-                        className="p-2 rounded-lg hover:bg-blue-50 text-blue-600"
+                        disabled={isFetchingDetails}
+                        onClick={() => {
+                          const id = order._id ?? order.id;
+                          if (id) {
+                            void handleViewOrder(id);
+                          }
+                        }}
+                        className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 disabled:opacity-50"
                       >
                         <Eye size={18} />
                       </button>

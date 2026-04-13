@@ -27,6 +27,13 @@ export interface ProductListResponse {
   data: Product[];
 }
 
+export interface ProductDetailsResponse {
+  status: string;
+  code: number;
+  message: string;
+  data: Product;
+}
+
 export const productApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     createProduct: builder.mutation<unknown, FormData>({
@@ -62,6 +69,13 @@ export const productApi = baseApi.injectEndpoints({
       }),
       providesTags: ["Product"],
     }),
+    getProductById: builder.query<ProductDetailsResponse, string>({
+      query: (id) => ({
+        url: `/api/v1/products/${id}`,
+        method: "GET",
+      }),
+      providesTags: ["Product"],
+    }),
   }),
 });
 
@@ -70,4 +84,5 @@ export const {
   useUpdateProductMutation,
   useDeleteProductMutation,
   useGetAllProductsQuery,
+  useLazyGetProductByIdQuery,
 } = productApi;

@@ -13,6 +13,13 @@ export interface OrderListResponse<TOrder = unknown> {
   data: TOrder[];
 }
 
+export interface OrderDetailsResponse<TOrder = unknown> {
+  status: string;
+  code: number;
+  message: string;
+  data: TOrder;
+}
+
 export const orderApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getAllOrders: builder.query<OrderListResponse, void>({
@@ -29,7 +36,18 @@ export const orderApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Order"],
     }),
+    getOrderById: builder.query<OrderDetailsResponse, string>({
+      query: (id) => ({
+        url: `/api/v1/orders/${id}`,
+        method: "GET",
+      }),
+      providesTags: ["Order"],
+    }),
   }),
 });
 
-export const { useGetAllOrdersQuery, useDeleteOrderMutation } = orderApi;
+export const {
+  useGetAllOrdersQuery,
+  useDeleteOrderMutation,
+  useLazyGetOrderByIdQuery,
+} = orderApi;

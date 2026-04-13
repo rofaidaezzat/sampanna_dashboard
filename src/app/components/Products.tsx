@@ -1,10 +1,12 @@
+import React from "react";
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import {
   Product,
   useCreateProductMutation,
   useDeleteProductMutation,
   useGetAllProductsQuery,
+  useLazyGetProductByIdQuery,
   useUpdateProductMutation,
 } from "../../redux/services/crudproduct";
 
@@ -32,6 +34,7 @@ export function Products() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState("");
   const [formData, setFormData] = useState<ProductForm>(initialForm);
@@ -40,6 +43,8 @@ export function Products() {
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
   const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
   const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
+  const [getProductById, { isLoading: isFetchingDetails }] =
+    useLazyGetProductByIdQuery();
 
   const products = data?.data ?? [];
   const isSubmitting = isCreating || isUpdating;
@@ -131,6 +136,21 @@ export function Products() {
     }
   };
 
+  const handleViewProduct = async (id: string) => {
+    setError("");
+    try {
+      const response = await getProductById(id).unwrap();
+      setSelectedProduct(response.data);
+    } catch (err: unknown) {
+      const maybeError = err as { data?: { message?: string }; message?: string };
+      setError(
+        maybeError?.data?.message ??
+          maybeError?.message ??
+          "Failed to load product details.",
+      );
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -192,6 +212,13 @@ export function Products() {
                   <td className="px-6 py-4">${product.price}</td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
+                      <button
+                        disabled={isFetchingDetails}
+                        onClick={() => void handleViewProduct(product._id)}
+                        className="p-2 rounded-lg hover:bg-indigo-50 text-indigo-600 disabled:opacity-50"
+                      >
+                        <Eye size={18} />
+                      </button>
                       <button
                         onClick={() => handleOpenModal(product)}
                         className="p-2 rounded-lg hover:bg-blue-50 text-blue-600"
@@ -390,6 +417,72 @@ export function Products() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {selectedProduct && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div
+            className="absolute inset-0 backdrop-blur-sm bg-white/20"
+            onClick={() => setSelectedProduct(null)}
+          />
+          <div className="relative z-10 bg-white rounded-lg p-6 w-full max-w-2xl">
+            <h2 className="text-2xl mb-4">Product Details</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-gray-600 text-sm">ID</p>
+                  <p>{selectedProduct._id}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">Name</p>
+                  <p>{selectedProduct.name}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">Description</p>
+                  <p>{selectedProduct.description}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">Category</p>
+                  <p>{selectedProduct.category}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">Price</p>
+                  <p>${selectedProduct.price}</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-gray-600 text-sm">Sizes</p>
+                  <p>{selectedProduct.sizes?.join(", ") || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">Colors</p>
+                  <p>{selectedProduct.colors?.join(", ") || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">Images</p>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {(selectedProduct.images ?? []).map((image) => (
+                      <img
+                        key={image}
+                        src={image}
+                        alt={selectedProduct.name}
+                        className="w-full h-24 object-cover rounded-md"
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedProduct(null)}
+              className="mt-6 w-full py-2 rounded-lg"
+              style={{ backgroundColor: "#fef200", color: "#000" }}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
