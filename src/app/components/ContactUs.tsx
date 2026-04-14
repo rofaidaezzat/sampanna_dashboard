@@ -26,7 +26,7 @@ export function ContactUs() {
             <Mail size={24} className="text-black" />
           </div>
           <h3 className="mb-2">Email</h3>
-          <p className="text-gray-600 text-sm">support@dashboard.com</p>
+          <p className="text-gray-600 text-sm">evristclimber@gmail.com</p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -37,7 +37,7 @@ export function ContactUs() {
             <Phone size={24} className="text-black" />
           </div>
           <h3 className="mb-2">Phone</h3>
-          <p className="text-gray-600 text-sm">+1 (555) 123-4567</p>
+          <p className="text-gray-600 text-sm">01111530022</p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -48,7 +48,7 @@ export function ContactUs() {
             <MapPin size={24} className="text-black" />
           </div>
           <h3 className="mb-2">Address</h3>
-          <p className="text-gray-600 text-sm">123 Business St, City, State</p>
+          <p className="text-gray-600 text-sm">Ismailia (Online Store)</p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-sm">
